@@ -1,0 +1,195 @@
+import tensorflow as tf
+from tensorflow.keras import Model
+from tensorflow.keras.layers import GlobalAveragePooling2D, Flatten, Dense, Dropout
+from tensorflow.keras.applications import  Xception
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping
+import numpy as np
+
+base_model =  Xception(weights='imagenet', include_top=False, input_shape=(299, 299, 3))
+for layer in base_model.layers:
+    layer.trainable = False
+
+x = base_model.output
+x = GlobalAveragePooling2D()(x)
+x = Flatten()(x)
+x = Dense(units=1024, activation='relu')(x)
+x = Dropout(0.3)(x)
+output  = Dense(units=2, activation='softmax')(x)
+model = Model(inputs=base_model.input, outputs=output)
+model.summary()
+
+# Use the Image Data Generator to import the images from the dataset
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+
+train_datagen = ImageDataGenerator(rescale=1./255, 
+                                rotation_range=40,
+                                width_shift_range=0.2,
+                                height_shift_range=0.2,
+                                shear_range=0.2,
+                                zoom_range=0.2,
+                                horizontal_flip=True,
+                                fill_mode='nearest')
+
+valid_datagen = ImageDataGenerator(rescale = 1./255)
+
+# Make sure you provide the same target size as initialied for the image size
+train_set = train_datagen.flow_from_directory('Fig_dataset/train',
+                                                 target_size = (299, 299),
+                                                 batch_size = 32,
+                                                 class_mode = 'categorical')
+
+valid_set = valid_datagen.flow_from_directory('Fig_dataset/test',
+                                                 target_size = (299, 299),
+                                                 batch_size = 32,
+                                                 class_mode = 'categorical',
+                                                 shuffle=False)
+
+model.compile(loss="categorical_crossentropy", 
+             optimizer = Adam(learning_rate=0.001),
+             metrics =['accuracy']) 
+#model.summary()
+
+# Train the model
+r = model.fit(
+  train_set,
+  validation_data=valid_set,
+  epochs=10,
+  steps_per_epoch= len(train_set),
+  validation_steps=len(valid_set))
+
+model.save('Fig_weights/Xception1111.h5')
+# plot the loss
+import matplotlib.pyplot as plt
+plt.plot(r.history['loss'], label='train loss')
+plt.plot(r.history['val_loss'], label='val loss')
+plt.legend()
+
+plt.ylabel('Loss')
+plt.xlabel('Epoch')
+plt.grid()
+
+# Set y-axis limits
+ax = plt.gca()
+ax.set_ylim(0, 1)
+
+plt.show()
+plt.savefig('LossVal_loss')
+
+# plot the accuracy
+plt.plot(r.history['accuracy'], label='train acc')
+plt.plot(r.history['val_accuracy'], label='val acc')
+plt.legend()
+
+plt.ylabel('Accuracy')
+plt.xlabel('Epoch')
+plt.grid()
+
+# Set y-axis limits
+ax = plt.gca()
+ax.set_ylim(0, 1)
+
+plt.show()
+plt.savefig('AccVal_acc')
+
+import sklearn
+from sklearn.metrics import confusion_matrix, recall_score, precision_score, f1_score
+
+# make predictions on the test set
+y_pred = model.predict(valid_set)
+
+# convert the predicted probabilities to class labels
+y_pred = np.argmax(y_pred, axis=1)
+
+# get the true class labels
+y_true = valid_set.classes
+from sklearn.metrics import confusion_matrix, recall_score, precision_score, f1_score, cohen_kappa_score, roc_auc_score
+import time
+import matplotlib.pyplot as plt
+import numpy as np
+
+# Measure test time
+start_time = time.time()
+
+# Make predictions on the test set
+y_pred = model.predict(valid_set)
+
+test_time = time.time() - start_time
+print(f"Test time: {test_time} seconds")
+
+# Convert the predicted probabilities to class labels
+y_pred_classes = np.argmax(y_pred, axis=1)
+
+# Get the true class labels
+y_true = valid_set.classes
+
+# Confusion matrix
+conf_matrix = confusion_matrix(y_true, y_pred_classes)
+print("Confusion matrix:", conf_matrix)
+
+# Accuracy
+accuracy = np.mean(y_true == y_pred_classes)
+print("Accuracy:", accuracy)
+
+# Recall
+recall = recall_score(y_true, y_pred_classes)
+print("Recall:", recall)
+
+# Precision
+precision = precision_score(y_true, y_pred_classes)
+print("Precision:", precision)
+
+# F1 score
+f1 = f1_score(y_true, y_pred_classes)
+print("F1 score:", f1)
+
+# Kappa
+kappa = cohen_kappa_score(y_true, y_pred_classes)
+print("Cohen's Kappa:", kappa)
+
+# AUC
+# Note: Since this is a multi-class classification, we need to binarize the labels for AUC calculation.
+y_true_bin = tf.keras.utils.to_categorical(y_true, num_classes=2)
+auc = roc_auc_score(y_true_bin, y_pred)
+print("AUC:", auc)
+from sklearn import metrics
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Generate confusion matrix
+confusion_matrix = metrics.confusion_matrix(y_true, y_pred)
+
+# Create ConfusionMatrixDisplay object
+cm_display = metrics.ConfusionMatrixDisplay(confusion_matrix=confusion_matrix, display_labels=[False, True])
+
+# Plot the confusion matrix
+fig, ax = plt.subplots()
+cm_display.plot(ax=ax)  # Pass the axes object to the plot function
+
+# Set the tick labels font size
+ax.tick_params(axis='both', labelsize=20)
+
+# Set the x-axis and y-axis tick labels
+tick_marks = np.arange(2)
+plt.xticks(tick_marks, ['healthy', 'infected'], rotation=45, fontsize=14)
+plt.yticks(tick_marks, ['healthy', 'infected'], fontsize=14)
+
+# Set the axis labels font size
+plt.xlabel('Predicted label', fontsize=14)
+plt.ylabel('True label', fontsize=14)
+
+# Get the text objects for the result values
+text_objects = ax.texts
+
+# Set the font size for the result values
+for text_obj in text_objects:
+    if text_obj.get_text().isdigit():  # Check if the text is a digit (result value)
+        text_obj.set_fontsize(20)  # Set the desired font size
+
+# Adjust the plot layout
+plt.tight_layout()
+
+# Show the plot
+plt.show()
+
